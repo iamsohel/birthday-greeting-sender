@@ -1,0 +1,54 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    command: ./entrypoint.sh
+    ports:
+      - 8000:8000
+    depends_on:
+      - redis
+    restart: on-failure
+    volumes:
+      - .:/app
+  redis:
+    image: redis:7.2.4-alpine
+    ports:
+      - 6379:6379
+    restart: always
+    volumes:
+      - redisdata:/data
+  smtp4dev:
+    image: rnwood/smtp4dev:v3
+    ports:
+      - 5055:80
+      - 25:25
+    restart: always
+  celery:
+    build: .
+    command: celery -A core worker --loglevel=info
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+  celery-beat:
+    build: .
+    command: celery -A core beat --loglevel=info
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+  flower:
+    build: .
+    command: celery -A core flower
+    depends_on:
+      - api
+      - redis
+      - celery
+    environment:
+      - DEBUG=1
+      - CELERY_BROKER=redis://redis:6379/1
+      - CELERY_BACKEND=redis://redis:6379/1
+    ports:
+      - 5555:5555
+volumes:
+  redisdata:
